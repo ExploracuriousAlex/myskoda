@@ -2,12 +2,14 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
 
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
 from mashumaro.mixins.yaml import DataClassYAMLMixin
+
+from .common import BaseResponse
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,6 +18,7 @@ class CapabilityId(StrEnum):
     """List of known Capabilities."""
 
     ACCESS = "ACCESS"
+    ACCIDENT_DAMAGE_MANAGEMENT = "ACCIDENT_DAMAGE_MANAGEMENT"
     ACTIVE_VENTILATION = "ACTIVE_VENTILATION"
     AIR_CONDITIONING = "AIR_CONDITIONING"
     AIR_CONDITIONING_HEATING_SOURCE_AUXILIARY = "AIR_CONDITIONING_HEATING_SOURCE_AUXILIARY"
@@ -61,6 +64,7 @@ class CapabilityId(StrEnum):
     MEASUREMENTS = "MEASUREMENTS"
     MISUSE_PROTECTION = "MISUSE_PROTECTION"
     NEWS = "NEWS"
+    ONLINE_REMOTE_UPDATE = "ONLINE_REMOTE_UPDATE"
     ONLINE_SPEECH_GPS = "ONLINE_SPEECH_GPS"
     OUTSIDE_TEMPERATURE = "OUTSIDE_TEMPERATURE"
     PARKING_INFORMATION = "PARKING_INFORMATION"
@@ -263,7 +267,7 @@ class CompositeRender(DataClassORJSONMixin):
 
 
 @dataclass
-class Info(DataClassORJSONMixin):
+class Info(BaseResponse):
     """Basic vehicle information."""
 
     state: VehicleState
@@ -285,7 +289,6 @@ class Info(DataClassORJSONMixin):
     )
     license_plate: str | None = field(default=None, metadata=field_options(alias="licensePlate"))
     errors: list[Error] | None = field(default=None)
-    timestamp: datetime | None = field(default=None)
 
     def has_capability(self, cap: CapabilityId) -> bool:
         """Check for a capability.

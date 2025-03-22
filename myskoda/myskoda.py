@@ -6,6 +6,7 @@ This class provides all methods to operate on the API and MQTT broker.
 import logging
 from asyncio import gather, timeout
 from collections.abc import Awaitable, Callable
+from copy import deepcopy
 from datetime import UTC, datetime
 from ssl import SSLContext
 from traceback import format_exc
@@ -26,7 +27,7 @@ from myskoda.models.fixtures import (
 
 from .__version__ import __version__ as version
 from .auth.authorization import Authorization
-from .const import MQTT_OPERATION_TIMEOUT
+from .const import BASE_URL_SKODA, CLIENT_ID, MQTT_OPERATION_TIMEOUT, REDIRECT_URI
 from .event import Event
 from .models.air_conditioning import (
     AirConditioning,
@@ -38,6 +39,7 @@ from .models.air_conditioning import (
 )
 from .models.auxiliary_heating import AuxiliaryConfig, AuxiliaryHeating, AuxiliaryHeatingTimer
 from .models.charging import ChargeMode, Charging
+from .models.chargingprofiles import ChargingProfiles
 from .models.departure import DepartureInfo, DepartureTimer
 from .models.driving_range import DrivingRange
 from .models.health import Health
@@ -54,6 +56,8 @@ from .rest_api import GetEndpointResult, RestApi
 from .vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
+
+type Vin = str
 
 
 async def trace_response(
@@ -77,12 +81,19 @@ TRACE_CONFIG = TraceConfig()
 TRACE_CONFIG.on_request_end.append(trace_response)
 
 
+class MySkodaAuthorization(Authorization):
+    client_id: str = CLIENT_ID  #  pyright: ignore[reportIncompatibleMethodOverride]
+    redirect_uri: str = REDIRECT_URI  #  pyright: ignore[reportIncompatibleMethodOverride]
+    base_url: str = BASE_URL_SKODA  #  pyright: ignore[reportIncompatibleMethodOverride]
+
+
 class MySkoda:
     session: ClientSession
     rest_api: RestApi
     mqtt: MySkodaMqttClient | None = None
-    authorization: Authorization
+    authorization: MySkodaAuthorization
     ssl_context: SSLContext | None = None
+    vehicles: dict[Vin, Vehicle]
 
     def __init__(  # noqa: D107, PLR0913
         self,
@@ -93,8 +104,9 @@ class MySkoda:
         mqtt_broker_port: int | None = None,
         mqtt_enable_ssl: bool | None = None,
     ) -> None:
+        self.vehicles: dict[Vin, Vehicle] = {}
         self.session = session
-        self.authorization = Authorization(session)
+        self.authorization = MySkodaAuthorization(session)
         self.rest_api = RestApi(self.session, self.authorization)
         self.ssl_context = ssl_context
         self.mqtt_broker_host = mqtt_broker_host
@@ -340,6 +352,10 @@ class MySkoda:
         """Retrieve information related to charging for the specified vehicle."""
         return (await self.rest_api.get_charging(vin, anonymize=anonymize)).result
 
+    async def get_charging_profiles(self, vin: str, anonymize: bool = False) -> ChargingProfiles:
+        """Retrieve information related to charging profiles for the specified vehicle."""
+        return (await self.rest_api.get_charging_profiles(vin, anonymize=anonymize)).result
+
     async def get_status(self, vin: str, anonymize: bool = False) -> Status:
         """Retrieve the current status for the specified vehicle."""
         return (await self.rest_api.get_status(vin, anonymize=anonymize)).result
@@ -408,37 +424,39 @@ class MySkoda:
         info = await self.get_info(vin)
         maintenance = await self.get_maintenance(vin)
 
-        vehicle = Vehicle(info, maintenance)
+        if vin in self.vehicles:
+            self.vehicles[vin].info = info
+            self.vehicles[vin].maintenance = maintenance
+        else:
+            self.vehicles[vin] = Vehicle(info, maintenance)
 
         for capa in capabilities:
             if info.is_capability_available(capa):
-                await self._request_capability_data(vehicle, vin, capa)
+                await self._request_capability_data(vin, capa)
 
-        return vehicle
+        return deepcopy(self.vehicles[vin])
 
-    async def _request_capability_data(
-        self, vehicle: Vehicle, vin: str, capa: CapabilityId
-    ) -> None:
+    async def _request_capability_data(self, vin: str, capa: CapabilityId) -> None:
         """Request specific capability data from MySkoda API."""
         try:
             match capa:
                 case CapabilityId.AIR_CONDITIONING:
-                    vehicle.air_conditioning = await self.get_air_conditioning(vin)
+                    self.vehicles[vin].air_conditioning = await self.get_air_conditioning(vin)
                 case CapabilityId.AUXILIARY_HEATING:
-                    vehicle.auxiliary_heating = await self.get_auxiliary_heating(vin)
+                    self.vehicles[vin].auxiliary_heating = await self.get_auxiliary_heating(vin)
                 case CapabilityId.CHARGING:
-                    vehicle.charging = await self.get_charging(vin)
+                    self.vehicles[vin].charging = await self.get_charging(vin)
                 case CapabilityId.PARKING_POSITION:
-                    vehicle.positions = await self.get_positions(vin)
+                    self.vehicles[vin].positions = await self.get_positions(vin)
                 case CapabilityId.STATE:
-                    vehicle.status = await self.get_status(vin)
-                    vehicle.driving_range = await self.get_driving_range(vin)
+                    self.vehicles[vin].status = await self.get_status(vin)
+                    self.vehicles[vin].driving_range = await self.get_driving_range(vin)
                 case CapabilityId.TRIP_STATISTICS:
-                    vehicle.trip_statistics = await self.get_trip_statistics(vin)
+                    self.vehicles[vin].trip_statistics = await self.get_trip_statistics(vin)
                 case CapabilityId.VEHICLE_HEALTH_INSPECTION:
-                    vehicle.health = await self.get_health(vin)
+                    self.vehicles[vin].health = await self.get_health(vin)
                 case CapabilityId.DEPARTURE_TIMERS:
-                    vehicle.departure_info = await self.get_departure_timers(vin)
+                    self.vehicles[vin].departure_info = await self.get_departure_timers(vin)
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Requesting %s failed: %s, continue", capa, err)
 
@@ -485,6 +503,7 @@ class MySkoda:
             Endpoint.POSITIONS: self.rest_api.get_positions,
             Endpoint.HEALTH: self.rest_api.get_health,
             Endpoint.CHARGING: self.rest_api.get_charging,
+            Endpoint.CHARGING_PROFILES: self.rest_api.get_charging_profiles,
             Endpoint.MAINTENANCE: self.rest_api.get_maintenance,
             Endpoint.DRIVING_RANGE: self.rest_api.get_driving_range,
             Endpoint.TRIP_STATISTICS: self.rest_api.get_trip_statistics,
