@@ -172,16 +172,18 @@ class MySkodaMqttClient:
                     _LOGGER.info("Connected to MQTT")
                     _LOGGER.debug("using MQTT client %s", client)
                     for vin in self.vehicle_vins:
-                        for topic in MQTT_OPERATION_TOPICS:
-                            await client.subscribe(
-                                f"{self.user_id}/{vin}/operation-request/{topic}"
-                            )
-                        for topic in MQTT_SERVICE_EVENT_TOPICS:
-                            await client.subscribe(f"{self.user_id}/{vin}/service-event/{topic}")
-                        for topic in MQTT_ACCOUNT_EVENT_TOPICS:
-                            await client.subscribe(f"{self.user_id}/{vin}/account-event/{topic}")
-                        for topic in MQTT_VEHICLE_EVENT_TOPICS:
-                            await client.subscribe(f"{self.user_id}/{vin}/vehicle-event/{topic}")
+                        # for topic in MQTT_OPERATION_TOPICS:
+                        #     await client.subscribe(
+                        #         f"{self.user_id}/{vin}/operation-request/{topic}"
+                        #     )
+                        # for topic in MQTT_SERVICE_EVENT_TOPICS:
+                        #     await client.subscribe(f"{self.user_id}/{vin}/service-event/{topic}")
+                        # for topic in MQTT_ACCOUNT_EVENT_TOPICS:
+                        #     await client.subscribe(f"{self.user_id}/{vin}/account-event/{topic}")
+                        # for topic in MQTT_VEHICLE_EVENT_TOPICS:
+                        #     await client.subscribe(f"{self.user_id}/{vin}/vehicle-event/{topic}")
+
+                        await client.subscribe(f"{self.user_id}/{vin}/#")
 
                     self._subscribed.set()
                     self._reconnect_delay = MQTT_RECONNECT_DELAY
