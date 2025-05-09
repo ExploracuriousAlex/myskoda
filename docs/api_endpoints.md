@@ -115,8 +115,8 @@ head -n 9 docs/api_endpoints.md && tail -n +10 docs/api_endpoints.md | sort --fi
 | prior98 | POST   | api/v1/vehicle-wakeup/{vin}                                                | ✅     |         |
 | EnergyX | GET    | api/v2/air-conditioning/{vin}                                              | ✅     |         |
 | EnergyX | GET    | api/v2/air-conditioning/{vin}/active-ventilation                           |       | <pre lang="json"> {"state":"INVALID","durationInSeconds":600,"timers":[],"errors":[{"type":"UNAVAILABLE_CLIMA_INFORMATION"}]}</pre> |
-| EnergyX | POST   | api/v2/air-conditioning/{vin}/active-ventilation/start                     |       |         |
-| EnergyX | POST   | api/v2/air-conditioning/{vin}/active-ventilation/stop                      |       |         |
+| EnergyX | POST   | api/v2/air-conditioning/{vin}/active-ventilation/start                     | ✅     |         |
+| EnergyX | POST   | api/v2/air-conditioning/{vin}/active-ventilation/stop                      | ✅     |         |
 | EnergyX | POST   | api/v2/air-conditioning/{vin}/active-ventilation/timers                    |       |         |
 | EnergyX | GET    | api/v2/air-conditioning/{vin}/auxiliary-heating                            | ✅     |         |
 | EnergyX | POST   | api/v2/air-conditioning/{vin}/auxiliary-heating/start                      | ✅     |         |
@@ -133,7 +133,7 @@ head -n 9 docs/api_endpoints.md && tail -n +10 docs/api_endpoints.md | sort --fi
 | EnergyX | POST   | api/v2/air-conditioning/{vin}/stop-window-heating                          | ✅     |         |
 | EnergyX | POST   | api/v2/air-conditioning/{vin}/timers                                       | ✅     |         |
 | EnergyX | GET    | api/v2/car-configurator/url                                                |       |         |
-| lglerup | GET    | api/v2/connection-status/{vin}/readiness                                   |       | <pre lang="json"> {'unreachable': False, 'inMotion': False, 'batteryProtectionLimitOn': False} </pre> |
+| lglerup | GET    | api/v2/connection-status/{vin}/readiness                                   | ✅     | <pre lang="json"> {'unreachable': False, 'inMotion': False, 'batteryProtectionLimitOn': False} </pre> |
 | EnergyX | POST   | api/v2/consents                                                            |       |         |
 | EnergyX | PATCH  | api/v2/consents/eprivacy/{vin}                                             |       |         |
 | EnergyX | GET    | api/v2/consents/eprivacy/{vin}                                             |       | <pre lang="json"> {"consented":false,"link":"https://www.skoda-auto.com/other/eprivacy-nl"}</pre> |
