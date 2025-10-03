@@ -8,7 +8,7 @@ from .models.driving_range import DrivingRange
 from .models.health import Health
 from .models.info import CapabilityId, Info
 from .models.maintenance import Maintenance
-from .models.position import Positions
+from .models.position import ParkingPositionV3, Positions
 from .models.status import Status
 from .models.trip_statistics import TripStatistics
 from .models.vehicle_connection_status import VehicleConnectionStatus
@@ -23,6 +23,7 @@ class Vehicle:
     air_conditioning: AirConditioning | None = None
     auxiliary_heating: AuxiliaryHeating | None = None
     positions: Positions | None = None
+    parking_position: ParkingPositionV3 | None = None
     driving_range: DrivingRange | None = None
     trip_statistics: TripStatistics | None = None
     maintenance: Maintenance
@@ -30,7 +31,7 @@ class Vehicle:
     departure_info: DepartureInfo | None = None
     connection_status: VehicleConnectionStatus | None = None
 
-    def __init__(self, info: Info, maintenance: Maintenance) -> None:
+    def __init__(self, info: Info, maintenance: Maintenance) -> None:  # pragma: no cover
         self.info = info
         self.maintenance = maintenance
 

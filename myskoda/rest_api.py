@@ -21,6 +21,7 @@ from myskoda.anonymize import (
     anonymize_health,
     anonymize_info,
     anonymize_maintenance,
+    anonymize_parking_position,
     anonymize_positions,
     anonymize_status,
     anonymize_trip_statistics,
@@ -28,9 +29,6 @@ from myskoda.anonymize import (
     anonymize_user,
     anonymize_vehicle_connection_status,
 )
-from myskoda.models.charging import ChargeMode
-from myskoda.models.garage import Garage
-from myskoda.models.position import Position, PositionType
 
 from .auth.authorization import Authorization
 from .const import BASE_URL_SKODA, REQUEST_TIMEOUT_IN_SECONDS
@@ -43,19 +41,23 @@ from .models.air_conditioning import (
     WindowHeating,
 )
 from .models.auxiliary_heating import AuxiliaryConfig, AuxiliaryHeating, AuxiliaryHeatingTimer
-from .models.charging import Charging
+from .models.charging import ChargeMode, Charging
+from .models.charging_history import ChargingHistory
 from .models.chargingprofiles import ChargingProfiles
+from .models.common import Vin
 from .models.departure import DepartureInfo, DepartureTimer
 from .models.driving_range import DrivingRange
+from .models.garage import Garage
 from .models.health import Health
 from .models.info import Info
-from .models.maintenance import Maintenance
-from .models.position import Positions
+from .models.maintenance import Maintenance, MaintenanceReport
+from .models.position import ParkingPositionV3, Position, Positions, PositionType
 from .models.spin import Spin
 from .models.status import Status
 from .models.trip_statistics import TripStatistics
 from .models.user import User
 from .models.vehicle_connection_status import VehicleConnectionStatus
+from .utils import to_iso8601
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,10 +104,10 @@ class RestApi:
                     await response.text()  # Ensure response is fully read
                     response.raise_for_status()
                     return await response.text()
-        except TimeoutError:
+        except TimeoutError:  # pragma: no cover
             _LOGGER.exception("Timeout while sending %s request to %s", method, url)
             raise
-        except ClientResponseError as err:
+        except ClientResponseError as err:  # pragma: no cover
             _LOGGER.exception("Invalid status for %s request to %s: %d", method, url, err.status)
             raise
 
@@ -169,6 +171,32 @@ class RestApi:
         url = anonymize_url(url) if anonymize else url
         return GetEndpointResult(url=url, raw=raw, result=result)
 
+    async def get_charging_history(
+        self,
+        vin: str,
+        cursor: datetime | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int = 50,
+    ) -> GetEndpointResult[ChargingHistory]:
+        """Retrieve charging history information for the specified vehicle."""
+        url = f"/v1/charging/{vin}/history?userTimezone=UTC&limit={limit}"
+        if cursor:
+            url += f"&cursor={to_iso8601(cursor)}"
+        elif start or end:
+            if start:
+                url += f"&from={to_iso8601(start)}"
+            if end:
+                url += f"&to={to_iso8601(end)}"
+
+        raw = self.process_json(
+            data=await self._make_get_request(url),
+            anonymize=False,
+            anonymization_fn=anonymize_info,
+        )
+        result = self._deserialize(raw, ChargingHistory.from_json)
+        return GetEndpointResult(url=url, raw=raw, result=result)
+
     async def get_status(self, vin: str, anonymize: bool = False) -> GetEndpointResult[Status]:
         """Retrieve the current status for the specified vehicle."""
         url = f"/v2/vehicle-status/{vin}"
@@ -223,6 +251,19 @@ class RestApi:
         url = anonymize_url(url) if anonymize else url
         return GetEndpointResult(url=url, raw=raw, result=result)
 
+    async def get_parking_position(
+        self, vin: Vin, anonymize: bool = False
+    ) -> GetEndpointResult[ParkingPositionV3]:
+        """Retrieve the last known parking position for the specified vehicle."""
+        url = f"/v3/maps/positions/vehicles/{vin}/parking"
+        raw = self.process_json(
+            data=await self._make_get_request(url),
+            anonymize=anonymize,
+            anonymization_fn=anonymize_parking_position,
+        )
+        result = self._deserialize(raw, ParkingPositionV3.from_json)
+        return GetEndpointResult(url=url, raw=raw, result=result)
+
     async def get_driving_range(
         self, vin: str, anonymize: bool = False
     ) -> GetEndpointResult[DrivingRange]:
@@ -254,7 +295,7 @@ class RestApi:
     async def get_maintenance(
         self, vin: str, anonymize: bool = False
     ) -> GetEndpointResult[Maintenance]:
-        """Retrieve maintenance report."""
+        """Retrieve maintenance report, settings and history."""
         url = f"/v3/vehicle-maintenance/vehicles/{vin}"
         raw = self.process_json(
             data=await self._make_get_request(url),
@@ -263,6 +304,19 @@ class RestApi:
         )
         result = self._deserialize(raw, Maintenance.from_json)
         url = anonymize_url(url) if anonymize else url
+        return GetEndpointResult(url=url, raw=raw, result=result)
+
+    async def get_maintenance_report(
+        self, vin: str, anonymize: bool = False
+    ) -> GetEndpointResult[MaintenanceReport]:
+        """Retrieve just the maintenance report."""
+        url = f"/v3/vehicle-maintenance/vehicles/{vin}/report"
+        raw = self.process_json(
+            data=await self._make_get_request(url),
+            anonymize=anonymize,
+            anonymization_fn=anonymize_maintenance,
+        )
+        result = self._deserialize(raw, MaintenanceReport.from_json)
         return GetEndpointResult(url=url, raw=raw, result=result)
 
     async def get_health(self, vin: str, anonymize: bool = False) -> GetEndpointResult[Health]:
@@ -653,7 +707,7 @@ class RestApi:
             json=json_data,
         )
 
-    def _deserialize[T](self, text: str, deserialize: Callable[[str], T]) -> T:
+    def _deserialize[T](self, text: str, deserialize: Callable[[str], T]) -> T:  # pragma: no cover
         try:
             data = deserialize(text)
         except Exception:

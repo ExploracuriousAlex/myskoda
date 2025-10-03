@@ -33,6 +33,7 @@ class ChargeMode(CaseInsensitiveStrEnum):
     TIMER_CHARGING_WITH_CLIMATISATION = "TIMER_CHARGING_WITH_CLIMATISATION"
     TIMER = "TIMER"
     MANUAL = "MANUAL"
+    OTHER = "OTHER"
     OFF = "OFF"
 
 
@@ -46,6 +47,7 @@ class ChargingState(CaseInsensitiveStrEnum):
     CONNECT_CABLE = "CONNECT_CABLE"
     CONSERVING = "CONSERVING"
     CHARGING = "CHARGING"
+    ERROR = "ERROR"
 
 
 class ChargeType(StrEnum):
